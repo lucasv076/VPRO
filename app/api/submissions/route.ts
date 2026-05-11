@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const sentiment = searchParams.get("sentiment");
   const onderwerp = searchParams.get("onderwerp");
+  const hoofdthema = searchParams.get("hoofdthema");
   const spam = searchParams.get("spam");
 
   let query = supabaseAdmin
@@ -16,9 +17,11 @@ export async function GET(req: NextRequest) {
     .eq("tenant_id", tenantId)
     .order("ingediend_op", { ascending: false });
 
-  if (type) query = query.eq("type", type);
+  if (type === "feedback") query = query.in("type", ["klacht", "ervaring", "overig"]);
+  else if (type) query = query.eq("type", type);
   if (status) query = query.eq("status", status);
   if (sentiment) query = query.eq("sentiment", sentiment);
+  if (hoofdthema) query = query.eq("hoofdthema", hoofdthema);
   if (onderwerp) query = query.eq("onderwerp", onderwerp);
   if (spam === "true") query = query.eq("is_spam", true);
   else query = query.eq("is_spam", false);

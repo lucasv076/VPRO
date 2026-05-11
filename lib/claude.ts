@@ -15,8 +15,10 @@ Analyseer de inzending en geef ALLEEN een geldig JSON-object terug, zonder uitle
 
 Regels:
 - is_spam: true als het nep, reclame, betekenisloos of automatisch gegenereerd is
+- hoofdthema: kies EXACT één van deze zeven hoofdthema's op basis van de inhoud:
+  "Gezondheid en zorg" | "Werk en geld" | "Recht en onrecht" | "Wonen en leefomgeving" | "Onderwijs en jeugd" | "Klimaat en duurzaamheid" | "Misinformatie en privacy"
 - type: "vraag" | "klacht" | "tip" | "ervaring" | "overig"
-- onderwerp: kort label van het thema of programma (max 3 woorden)
+- onderwerp: specifiek subthema binnen het hoofdthema (max 3 woorden, Nederlands)
 - samenvatting: neutrale kern in 2-3 zinnen
 - sentiment: "positief" | "neutraal" | "negatief"
 - prioriteit: 1 (laag) t/m 5 (hoog), op basis van urgentie of maatschappelijke waarde

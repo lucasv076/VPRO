@@ -3,11 +3,16 @@ import { getFollowupQuestion } from "@/lib/claude";
 import { FormMessage } from "@/types";
 
 export async function POST(req: NextRequest) {
-  const { messages, currentText } = await req.json() as {
-    messages: FormMessage[];
-    currentText: string;
-  };
+  try {
+    const { messages, currentText } = await req.json() as {
+      messages: FormMessage[];
+      currentText: string;
+    };
 
-  const followup = await getFollowupQuestion(messages, currentText);
-  return NextResponse.json({ followup });
+    const followup = await getFollowupQuestion(messages, currentText);
+    return NextResponse.json({ followup });
+  } catch (err) {
+    console.error("analyze error:", err);
+    return NextResponse.json({ followup: null }, { status: 500 });
+  }
 }

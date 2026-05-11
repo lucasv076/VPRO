@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     origineel_bericht: origineel,
     volledige_context: volledige,
     is_spam: analyse.is_spam,
+    hoofdthema: analyse.hoofdthema,
     type: analyse.type,
     onderwerp: analyse.onderwerp,
     samenvatting: analyse.samenvatting,
