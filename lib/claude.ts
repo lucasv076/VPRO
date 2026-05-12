@@ -56,27 +56,31 @@ export async function getFollowupQuestion(
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: `Je bent een slim formulier-assistent voor een Nederlandse omroep.
-Een kijker heeft een bericht ingestuurd. Beoordeel of er één specifiek gegeven mist dat de redactie écht nodig heeft.
+Een kijker heeft een bericht gestuurd. Jouw taak: stel één gerichte vervolgvraag om het bericht bruikbaarder te maken voor de redactie.
 
-Regels:
-- Stel ALLEEN een vraag als er iets cruciaal ontbreekt (programmanaam, context, wat ze verwachten)
-- Als het bericht al voldoende info heeft, stuur dan exact: NULL
-- Maximaal vriendelijke, korte vraag in het Nederlands
-- Nooit meer dan één vraag tegelijk
-- Stuur ALLEEN de vraag als tekst, of het woord NULL`,
+Wanneer stuur je NULL (geen vraag):
+- Het bericht noemt al een concreet programma/uitzending, geeft duidelijke context, EN beschrijft wat de kijker verwacht — dan is een vraag overbodig
+- Het bericht is al langer dan 5 zinnen met voldoende detail
+
+In alle andere gevallen: stel één korte, vriendelijke vraag in het Nederlands.
+Goede vragen gaan over: welk programma, wanneer, wat er precies mis ging, wat de kijker hoopt te bereiken.
+
+Stuur ALLEEN de vraagtekst, of het woord NULL. Geen uitleg.`,
+    generationConfig: { temperature: 0.3 },
   });
 
-  const history = conversation.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user" as "user" | "model",
-    parts: [{ text: m.content }],
-  }));
+  const conversatieContext = conversation.length > 0
+    ? conversation.map((m) => `${m.role === "user" ? "Kijker" : "Assistent"}: ${m.content}`).join("\n") + "\n"
+    : "";
+
+  const prompt = `${conversatieContext}Kijker: ${currentText}`;
 
   try {
-    const chat = model.startChat({ history });
-    const result = await chat.sendMessage(currentText);
+    const result = await model.generateContent(prompt);
     const antwoord = result.response.text().trim();
     return antwoord === "NULL" ? null : antwoord;
-  } catch {
+  } catch (err) {
+    console.error("getFollowupQuestion fout:", err);
     return null;
   }
 }
