@@ -360,6 +360,26 @@ export default function Redactiedashboard() {
   );
 }
 
+function parseConversatie(volledige: string): Array<{ van: "kijker" | "formulier"; tekst: string }> {
+  if (!volledige) return [];
+  const berichten: Array<{ van: "kijker" | "formulier"; tekst: string }> = [];
+  let huidigVan: "kijker" | "formulier" | null = null;
+  let huidigTekst: string[] = [];
+  for (const regel of volledige.split("\n")) {
+    if (regel.startsWith("Kijker: ")) {
+      if (huidigVan) berichten.push({ van: huidigVan, tekst: huidigTekst.join("\n").trim() });
+      huidigVan = "kijker"; huidigTekst = [regel.slice(8)];
+    } else if (regel.startsWith("Formulier: ")) {
+      if (huidigVan) berichten.push({ van: huidigVan, tekst: huidigTekst.join("\n").trim() });
+      huidigVan = "formulier"; huidigTekst = [regel.slice(11)];
+    } else {
+      huidigTekst.push(regel);
+    }
+  }
+  if (huidigVan) berichten.push({ van: huidigVan, tekst: huidigTekst.join("\n").trim() });
+  return berichten;
+}
+
 function ChatInterface({ submission }: { submission: Submission }) {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [bericht, setBericht] = useState("");
@@ -421,18 +441,32 @@ function ChatInterface({ submission }: { submission: Submission }) {
       </div>
 
       <div className="p-4 space-y-3 max-h-72 overflow-y-auto">
-        {/* Origineel bericht van kijker */}
-        <div className="flex gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0 text-xs font-semibold text-gray-600">
-            {submission.naam ? submission.naam.charAt(0).toUpperCase() : "?"}
-          </div>
-          <div className="flex-1">
-            <div className="text-[10px] text-gray-400 mb-1">{submission.naam ?? "Anoniem"} · {new Date(submission.ingediend_op).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-            <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-gray-700 leading-relaxed">
-              {submission.origineel_bericht}
+        {/* Volledige conversatie van kijker (inclusief doorvragen) */}
+        {parseConversatie(submission.volledige_context || submission.origineel_bericht).map((m, i) => (
+          m.van === "kijker" ? (
+            <div key={i} className="flex gap-2.5">
+              <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0 text-xs font-semibold text-gray-600">
+                {submission.naam ? submission.naam.charAt(0).toUpperCase() : "?"}
+              </div>
+              <div className="flex-1">
+                {i === 0 && (
+                  <div className="text-[10px] text-gray-400 mb-1">
+                    {submission.naam ?? "Anoniem"} · {new Date(submission.ingediend_op).toLocaleString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                )}
+                <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {m.tekst}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          ) : (
+            <div key={i} className="flex justify-center">
+              <div className="text-[11px] text-gray-400 italic bg-gray-50 rounded-lg px-3 py-1.5 max-w-[85%] text-center">
+                ↩ {m.tekst}
+              </div>
+            </div>
+          )
+        ))}
 
         {/* Redactie replies */}
         {replies.map((r) => (
