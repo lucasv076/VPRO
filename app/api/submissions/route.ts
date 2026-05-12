@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from("submissions")
     .select("*")
-    .eq("tenant_id", tenantId)
+    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
     .order("ingediend_op", { ascending: false });
 
   if (type === "feedback") query = query.in("type", ["klacht", "ervaring", "overig"]);
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   if (hoofdthema) query = query.eq("hoofdthema", hoofdthema);
   if (onderwerp) query = query.eq("onderwerp", onderwerp);
   if (spam === "true") query = query.eq("is_spam", true);
-  else query = query.eq("is_spam", false);
+  else query = query.or("is_spam.eq.false,is_spam.is.null");
 
   const { data, error } = await query;
 
