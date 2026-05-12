@@ -1,28 +1,7 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AnalyzeResult, FormMessage, Submission, HOOFDTHEMAS } from "@/types";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-
-// Enforced JSON schema — Gemini gegarandeerd correcte veldstructuur
-const ANALYZE_SCHEMA = {
-  type: SchemaType.OBJECT,
-  properties: {
-    is_spam:           { type: SchemaType.BOOLEAN },
-    hoofdthema:        { type: SchemaType.STRING },
-    type:              { type: SchemaType.STRING },
-    onderwerp:         { type: SchemaType.STRING },
-    samenvatting:      { type: SchemaType.STRING },
-    sentiment:         { type: SchemaType.STRING },
-    prioriteit:        { type: SchemaType.NUMBER },
-    trefwoorden:       { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-    compleetheid_score:{ type: SchemaType.NUMBER },
-    followup_vraag:    { type: SchemaType.STRING, nullable: true },
-  },
-  required: [
-    "is_spam", "hoofdthema", "type", "onderwerp", "samenvatting",
-    "sentiment", "prioriteit", "trefwoorden", "compleetheid_score",
-  ],
-};
 
 // Veilige fallback als Gemini onverwacht output geeft
 const ANALYZE_FALLBACK: AnalyzeResult = {
@@ -58,16 +37,14 @@ Regels:
 - followup_vraag: één gerichte vervolgvraag als de score onder 6 is EN er iets cruciaal mist, anders null`,
     generationConfig: {
       responseMimeType: "application/json",
-      responseSchema: ANALYZE_SCHEMA,
-      // thinkingBudget: denk-tokens voor betere classificatie van complexe inzendingen
-      thinkingConfig: { thinkingBudget: 1024 },
-    } as Record<string, unknown>,
+    },
   });
 
   try {
     const result = await model.generateContent(tekst);
     return JSON.parse(result.response.text()) as AnalyzeResult;
-  } catch {
+  } catch (err) {
+    console.error("analyzeSubmission fout:", err);
     return ANALYZE_FALLBACK;
   }
 }
