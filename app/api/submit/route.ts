@@ -4,12 +4,13 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { FormMessage } from "@/types";
 
 export async function POST(req: NextRequest) {
-  const { messages, tenantId, naam, email, telefoonnummer } = await req.json() as {
+  const { messages, tenantId, naam, email, telefoonnummer, presetType } = await req.json() as {
     messages: FormMessage[];
     tenantId: string;
     naam: string;
     email: string;
     telefoonnummer: string;
+    presetType?: string;
   };
 
   const origineel = messages.find((m) => m.role === "user")?.content ?? "";
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     volledige_context: volledige,
     is_spam: analyse.is_spam,
     hoofdthema: analyse.hoofdthema,
-    type: analyse.type,
+    type: presetType ?? analyse.type,
     onderwerp: analyse.onderwerp,
     samenvatting: analyse.samenvatting,
     sentiment: analyse.sentiment,
