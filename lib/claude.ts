@@ -63,39 +63,47 @@ Regels:
   }
 }
 
-export async function getFollowupQuestion(
-  conversation: FormMessage[],
-  currentText: string
-): Promise<string | null> {
+// Combineert doorvraag + typedetectie in één AI-call
+export async function analyzeForForm(
+  currentText: string,
+  conversation: FormMessage[] = []
+): Promise<{ followup: string | null; suggestedType: string | null }> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
-    systemInstruction: `Je bent een slim formulier-assistent voor een Nederlandse omroep.
-Een kijker heeft een bericht gestuurd. Jouw taak: stel één gerichte vervolgvraag om het bericht bruikbaarder te maken voor de redactie.
+    systemInstruction: `Je bent een assistent voor een journalistiek platform.
+Analyseer het bericht van een kijker en geef twee dingen terug als JSON.
 
-Wanneer stuur je NULL (geen vraag):
-- Het bericht noemt al een concreet programma/uitzending, geeft duidelijke context, EN beschrijft wat de kijker verwacht
-- Het bericht is al langer dan 5 zinnen met voldoende detail
+1. followup: één korte, vriendelijke vervolgvraag in het Nederlands als er cruciale info mist
+   (bijv. welk programma, wanneer, wat er mis ging). Geef null als het bericht al voldoende is.
 
-In alle andere gevallen: stel één korte, vriendelijke vraag in het Nederlands.
-Goede vragen gaan over: welk programma, wanneer, wat er precies mis ging, wat de kijker hoopt te bereiken.
+2. suggestedType: het meest passende type voor dit bericht:
+   "tip"       – iets gezien/meegemaakt dat onderzocht moet worden
+   "ervaring"  – persoonlijke beleving of verhaal
+   "feedback"  – correctie of kritiek op berichtgeving
+   "vraag"     – vraag over onderwerp of redactie
+   "opmerking" – algemeen compliment of opmerking
 
-Stuur ALLEEN de vraagtekst, of het woord NULL. Geen uitleg.`,
-    generationConfig: { temperature: 0.3 },
+Geef ALLEEN geldig JSON terug: {"followup": "..." of null, "suggestedType": "..."}`,
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.3,
+    },
   });
 
-  const conversatieContext = conversation.length > 0
+  const context = conversation.length > 0
     ? conversation.map((m) => `${m.role === "user" ? "Kijker" : "Assistent"}: ${m.content}`).join("\n") + "\n"
     : "";
 
-  const prompt = `${conversatieContext}Kijker: ${currentText}`;
-
   try {
-    const result = await metRetry(() => model.generateContent(prompt));
-    const antwoord = result.response.text().trim();
-    return antwoord === "NULL" ? null : antwoord;
+    const result = await metRetry(() => model.generateContent(`${context}Kijker: ${currentText}`));
+    const parsed = JSON.parse(result.response.text()) as { followup?: string | null; suggestedType?: string | null };
+    return {
+      followup: parsed.followup && parsed.followup !== "NULL" ? parsed.followup : null,
+      suggestedType: parsed.suggestedType ?? null,
+    };
   } catch (err) {
-    console.error("getFollowupQuestion definitief mislukt:", err);
-    return null;
+    console.error("analyzeForForm definitief mislukt:", err);
+    return { followup: null, suggestedType: null };
   }
 }
 

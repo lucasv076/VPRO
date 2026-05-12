@@ -13,6 +13,7 @@ type Fase =
   | "bericht"
   | "ai-bezig"
   | "ai-followup"
+  | "type-suggestie"
   | "bijlage-vraag"
   | "bijlage-upload"
   | "toestemming-vraag"
@@ -27,12 +28,32 @@ interface ChatMsg {
   waarschuwing?: boolean;
 }
 
-const TYPE_KEUZE: { type: SelectType; label: string; kleur: string }[] = [
-  { type: "tip",       label: "Tip",       kleur: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" },
-  { type: "ervaring",  label: "Ervaring",  kleur: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" },
-  { type: "feedback",  label: "Feedback",  kleur: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100" },
-  { type: "vraag",     label: "Vraag",     kleur: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" },
-  { type: "opmerking", label: "Opmerking", kleur: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" },
+const TYPE_KEUZE: { type: SelectType; label: string; omschrijving: string; icon: string }[] = [
+  {
+    type: "tip", label: "Tip",
+    omschrijving: "Ik heb iets gezien of meegemaakt dat onderzocht moet worden",
+    icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z",
+  },
+  {
+    type: "ervaring", label: "Ervaring",
+    omschrijving: "Ik herken dit en wil mijn persoonlijke ervaring delen",
+    icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
+  },
+  {
+    type: "feedback", label: "Feedback",
+    omschrijving: "Ik heb feedback of een correctie op de berichtgeving",
+    icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
+  },
+  {
+    type: "vraag", label: "Vraag",
+    omschrijving: "Ik heb een vraag over dit onderwerp of over de redactie",
+    icon: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+  },
+  {
+    type: "opmerking", label: "Opmerking",
+    omschrijving: "Ik wil een algemene opmerking of compliment achterlaten",
+    icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
+  },
 ];
 
 const DB_TYPE: Record<SelectType, string> = {
@@ -56,6 +77,7 @@ export default function InstuurFormulier() {
   const [telefoon, setTelefoon] = useState("");
   const [aiMessages, setAiMessages] = useState<FormMessage[]>([]);
   const [aiFollowupVraag, setAiFollowupVraag] = useState<string | null>(null);
+  const [geadviseerdeType, setGeadviseerdeType] = useState<SelectType | null>(null);
   const [botTypt, setBotTypt] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -100,7 +122,7 @@ export default function InstuurFormulier() {
     const nieuweAiMsgs: FormMessage[] = [{ role: "user", content: tekst }];
     setAiMessages(nieuweAiMsgs);
 
-    // AI-doorvragen voor alle types
+    // AI analyseert in één call: doorvraag + typedetectie
     setFase("ai-bezig");
     try {
       const res = await fetch("/api/analyze", {
@@ -109,7 +131,20 @@ export default function InstuurFormulier() {
         body: JSON.stringify({ messages: [], currentText: tekst }),
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as { followup: string | null; suggestedType: string | null };
+
+        // Type-wisselsuggestie als AI een ander type detecteert
+        const geldigType = TYPE_KEUZE.find(k => k.type === data.suggestedType);
+        if (geldigType && data.suggestedType !== gekozenType) {
+          setGeadviseerdeType(geldigType.type);
+          // Sla de follow-up op zodat we hem later nog kunnen tonen
+          if (data.followup) setAiFollowupVraag(data.followup);
+          voegBotToe(`Op basis van je bericht lijkt dit meer op een "${geldigType.label}". Wil je van type wisselen?`);
+          setFase("type-suggestie");
+          return;
+        }
+
+        // Geen typewissel nodig — doorvragen indien nuttig
         if (data.followup) {
           setAiFollowupVraag(data.followup);
           voegBotToe(data.followup);
@@ -117,7 +152,7 @@ export default function InstuurFormulier() {
           return;
         }
       }
-    } catch { /* ga door zonder follow-up */ }
+    } catch { /* ga door zonder AI */ }
     await vervolgNaHoofdBericht(gekozenType, nieuweAiMsgs);
   }
 
@@ -149,6 +184,31 @@ export default function InstuurFormulier() {
     } else {
       await botBericht("Wat ontzettend leuk om te horen! We delen je compliment met het team.");
       await verstuur(msgs, t, null, null);
+    }
+  }
+
+  async function wisselType() {
+    if (!geadviseerdeType) return;
+    const oud = gekozenType;
+    setGekozenType(geadviseerdeType);
+    voegUserToe(`Ja, wissel naar ${TYPE_KEUZE.find(k => k.type === geadviseerdeType)?.label}.`);
+    // Toon follow-up als die er nog is, anders ga naar nieuwe type-flow
+    if (aiFollowupVraag) {
+      voegBotToe(aiFollowupVraag);
+      setFase("ai-followup");
+    } else {
+      await vervolgNaHoofdBericht(geadviseerdeType, aiMessages);
+    }
+    void oud;
+  }
+
+  async function behoudType() {
+    voegUserToe("Nee, ga door.");
+    if (aiFollowupVraag) {
+      voegBotToe(aiFollowupVraag);
+      setFase("ai-followup");
+    } else {
+      await vervolgNaHoofdBericht(gekozenType!, aiMessages);
     }
   }
 
@@ -217,11 +277,11 @@ export default function InstuurFormulier() {
   function opnieuw() {
     setGekozenType(null); setFase("keuze"); setBerichten([]);
     setInputTekst(""); setEmail(""); setTelefoon("");
-    setAiMessages([]); setAiFollowupVraag(null);
+    setAiMessages([]); setAiFollowupVraag(null); setGeadviseerdeType(null);
   }
 
   const bezig = botTypt || fase === "ai-bezig" || fase === "verzenden";
-  const gekozenKleur = TYPE_KEUZE.find(k => k.type === gekozenType);
+  const gekozenKaart = TYPE_KEUZE.find(k => k.type === gekozenType);
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -249,9 +309,12 @@ export default function InstuurFormulier() {
               </div>
             ))}
           </div>
-          {gekozenKleur && (
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-full border text-sm font-medium ${gekozenKleur.kleur}`}>
-              {gekozenKleur.label}
+          {gekozenKaart && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 text-sm font-medium text-gray-700">
+              <svg className="w-3.5 h-3.5" style={{ color: tenant.kleur }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={gekozenKaart.icon} />
+              </svg>
+              {gekozenKaart.label}
             </span>
           )}
         </div>
@@ -261,14 +324,20 @@ export default function InstuurFormulier() {
 
           {/* Type keuze */}
           {fase === "keuze" && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-3">
+            <div className="flex-1 flex flex-col justify-center p-6 space-y-3">
               <h2 className="text-base font-semibold text-gray-900 text-center mb-1">Waar wil je ons over vertellen?</h2>
-              {TYPE_KEUZE.map(({ type: t, label, kleur }) => (
-                <button key={t} onClick={() => kiesType(t)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border text-sm font-medium transition-all ${kleur}`}>
-                  {label}
-                </button>
-              ))}
+              <div className="grid grid-cols-2 gap-2">
+                {TYPE_KEUZE.map(({ type: t, label, omschrijving, icon }) => (
+                  <button key={t} onClick={() => kiesType(t)}
+                    className="text-left p-4 rounded-xl border border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm transition-all group">
+                    <svg className="w-5 h-5 mb-2" style={{ color: tenant.kleur }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+                    </svg>
+                    <div className="text-sm font-semibold text-gray-900">{label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{omschrijving}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -353,6 +422,20 @@ export default function InstuurFormulier() {
                           Verstuur →
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {fase === "type-suggestie" && (
+                    <div className="flex gap-2">
+                      <button onClick={wisselType}
+                        className="flex-1 py-2.5 text-sm font-semibold rounded-xl"
+                        style={{ backgroundColor: tenant.kleur, color: tenant.tekstKleur }}>
+                        Ja, wissel
+                      </button>
+                      <button onClick={behoudType}
+                        className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">
+                        Nee, ga door
+                      </button>
                     </div>
                   )}
 

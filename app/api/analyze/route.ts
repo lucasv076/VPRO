@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFollowupQuestion } from "@/lib/claude";
+import { analyzeForForm } from "@/lib/claude";
 import { FormMessage } from "@/types";
 
 export async function POST(req: NextRequest) {
@@ -9,10 +9,10 @@ export async function POST(req: NextRequest) {
       currentText: string;
     };
 
-    const followup = await getFollowupQuestion(messages, currentText);
-    return NextResponse.json({ followup });
+    const result = await analyzeForForm(currentText, messages);
+    return NextResponse.json(result);
   } catch (err) {
     console.error("analyze error:", err);
-    return NextResponse.json({ followup: null }, { status: 500 });
+    return NextResponse.json({ followup: null, suggestedType: null }, { status: 500 });
   }
 }
