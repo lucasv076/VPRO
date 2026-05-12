@@ -20,9 +20,6 @@ export async function POST(req: NextRequest) {
 
   const analyse = await analyzeSubmission(volledige);
 
-  const is_spam = analyse.routing_status === "spam";
-  const status = analyse.routing_status; // "spam" | "concept" | "klaar"
-
   const { error } = await supabaseAdmin.from("submissions").insert({
     tenant_id: tenantId,
     naam: naam || null,
@@ -30,7 +27,7 @@ export async function POST(req: NextRequest) {
     telefoonnummer: telefoonnummer || null,
     origineel_bericht: origineel,
     volledige_context: volledige,
-    is_spam,
+    is_spam: analyse.is_spam,
     hoofdthema: analyse.hoofdthema,
     type: presetType ?? analyse.type,
     onderwerp: analyse.onderwerp,
@@ -39,9 +36,7 @@ export async function POST(req: NextRequest) {
     prioriteit: analyse.prioriteit,
     trefwoorden: analyse.trefwoorden,
     compleetheid_score: analyse.compleetheid_score,
-    fase: analyse.fase,
-    volgende_stap: analyse.volgende_stap,
-    status,
+    status: "nieuw",
     labels: [],
   });
 

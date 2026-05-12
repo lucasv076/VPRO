@@ -13,6 +13,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     console.error("analyze error:", err);
-    return NextResponse.json({ isSpam: false, followup: null, suggestedType: null }, { status: 500 });
+    return NextResponse.json({ followup: null, suggestedType: null }, { status: 500 });
   }
 }

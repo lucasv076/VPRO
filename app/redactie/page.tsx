@@ -23,9 +23,6 @@ const TYPE_KNOPPEN = [
 ] as const;
 
 const STATUS_LABELS: Record<Status, string> = {
-  spam: "Spam",
-  concept: "Concept",
-  klaar: "Klaar",
   nieuw: "Nieuw",
   in_behandeling: "In behandeling",
   afgehandeld: "Afgerond",
@@ -46,13 +43,8 @@ const sentimentBadge: Record<Sentiment, string> = {
 };
 
 const statusBadge: Record<Status, string> = {
-  spam: "bg-red-50 text-red-600",
-  concept: "bg-amber-50 text-amber-700",
-  klaar: "bg-green-50 text-green-700",
-  nieuw: "bg-blue-50 text-blue-700",
-  in_behandeling: "bg-blue-50 text-blue-700",
-  afgehandeld: "bg-green-50 text-green-700",
-  gearchiveerd: "bg-gray-50 text-gray-500",
+  nieuw: "bg-blue-50 text-blue-700", in_behandeling: "bg-amber-50 text-amber-700",
+  afgehandeld: "bg-green-50 text-green-700", gearchiveerd: "bg-gray-50 text-gray-500",
 };
 
 const hoofdthemaKleur: Record<Hoofdthema, { bg: string; text: string; activeBg: string }> = {
@@ -252,7 +244,7 @@ export default function Redactiedashboard() {
 
             {/* Status knoppen */}
             <div className="flex gap-1.5">
-              {(["", "concept", "klaar", "in_behandeling"] as const).map((st) => (
+              {(["", "nieuw", "in_behandeling", "afgehandeld"] as const).map((st) => (
                 <button key={st} onClick={() => setFilterStatus(st)}
                   className={`flex-1 text-[10px] py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap ${filterStatus === st ? "text-white" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}
                   style={filterStatus === st ? { backgroundColor: tenant.kleur } : {}}>
@@ -682,7 +674,7 @@ function DetailPanel({ submission: s, tenantKleur, onStatusChange, onLabelAdd, o
       <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</h3>
         <div className="flex flex-wrap gap-2">
-          {(["concept", "klaar", "in_behandeling", "afgehandeld", "gearchiveerd"] as Status[]).map((st) => (
+          {(["nieuw", "in_behandeling", "afgehandeld", "gearchiveerd"] as Status[]).map((st) => (
             <button key={st} onClick={() => onStatusChange(s.id, st)}
               className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors ${s.status === st ? "border-transparent text-white" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}
               style={s.status === st ? { backgroundColor: tenantKleur } : {}}>

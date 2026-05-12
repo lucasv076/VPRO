@@ -1,7 +1,6 @@
 export type SubmissionType = "vraag" | "klacht" | "tip" | "ervaring" | "overig";
 export type Sentiment = "positief" | "neutraal" | "negatief";
-export type RoutingStatus = "spam" | "concept" | "klaar";
-export type Status = "spam" | "concept" | "klaar" | "nieuw" | "in_behandeling" | "afgehandeld" | "gearchiveerd";
+export type Status = "nieuw" | "in_behandeling" | "afgehandeld" | "gearchiveerd";
 
 export const HOOFDTHEMAS = [
   "Gezondheid en zorg",
@@ -19,7 +18,6 @@ export type Fase = "INHOUD" | "CONTACT" | "AFRONDING";
 
 export interface AnalyzeResult {
   is_spam: boolean;
-  routing_status: RoutingStatus;
   hoofdthema: Hoofdthema;
   type: SubmissionType;
   onderwerp: string;
