@@ -3,7 +3,20 @@ import { AnalyzeResult, FormMessage, Submission, HOOFDTHEMAS } from "@/types";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 
-// Veilige fallback als Gemini onverwacht output geeft
+// Wacht ms milliseconden — gebruikt bij retry
+const wacht = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Probeert fn() maximaal twee keer; wacht 2s tussen pogingen
+async function metRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    console.warn("Gemini fout, opnieuw proberen over 2s:", err);
+    await wacht(2000);
+    return await fn();
+  }
+}
+
 const ANALYZE_FALLBACK: AnalyzeResult = {
   is_spam: false,
   hoofdthema: HOOFDTHEMAS[0],
@@ -17,11 +30,13 @@ const ANALYZE_FALLBACK: AnalyzeResult = {
   followup_vraag: null,
 };
 
+const FOLLOWUP_FALLBACK = "Kun je wat meer vertellen over de situatie? Bijvoorbeeld welk programma het betreft, wanneer het speelde, of wat je graag zou willen zien?";
+
 export async function analyzeSubmission(tekst: string): Promise<AnalyzeResult> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: `Je bent een assistent die kijkersinzendingen verwerkt voor een Nederlandse omroep.
-Analyseer de inzending en geef een JSON-object terug.
+Analyseer de inzending en geef ALLEEN een geldig JSON-object terug, zonder uitleg of markdown.
 
 Regels:
 - is_spam: true als het nep, reclame, betekenisloos of automatisch gegenereerd is
@@ -41,10 +56,10 @@ Regels:
   });
 
   try {
-    const result = await model.generateContent(tekst);
+    const result = await metRetry(() => model.generateContent(tekst));
     return JSON.parse(result.response.text()) as AnalyzeResult;
   } catch (err) {
-    console.error("analyzeSubmission fout:", err);
+    console.error("analyzeSubmission definitief mislukt:", err);
     return ANALYZE_FALLBACK;
   }
 }
@@ -59,7 +74,7 @@ export async function getFollowupQuestion(
 Een kijker heeft een bericht gestuurd. Jouw taak: stel één gerichte vervolgvraag om het bericht bruikbaarder te maken voor de redactie.
 
 Wanneer stuur je NULL (geen vraag):
-- Het bericht noemt al een concreet programma/uitzending, geeft duidelijke context, EN beschrijft wat de kijker verwacht — dan is een vraag overbodig
+- Het bericht noemt al een concreet programma/uitzending, geeft duidelijke context, EN beschrijft wat de kijker verwacht
 - Het bericht is al langer dan 5 zinnen met voldoende detail
 
 In alle andere gevallen: stel één korte, vriendelijke vraag in het Nederlands.
@@ -76,16 +91,16 @@ Stuur ALLEEN de vraagtekst, of het woord NULL. Geen uitleg.`,
   const prompt = `${conversatieContext}Kijker: ${currentText}`;
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await metRetry(() => model.generateContent(prompt));
     const antwoord = result.response.text().trim();
     return antwoord === "NULL" ? null : antwoord;
   } catch (err) {
-    console.error("getFollowupQuestion fout:", err);
-    return null;
+    console.error("getFollowupQuestion definitief mislukt:", err);
+    // Geef een generieke vraag terug zodat doorvragen altijd werkt
+    return FOLLOWUP_FALLBACK;
   }
 }
 
-// Genereert een conceptreactie voor de redacteur op basis van de inzending
 export async function suggesteerAntwoord(submission: Submission): Promise<string> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
@@ -111,7 +126,7 @@ Regels:
   ].join("\n");
 
   try {
-    const result = await model.generateContent(context);
+    const result = await metRetry(() => model.generateContent(context));
     return result.response.text().trim();
   } catch {
     const naam = submission.naam ?? "kijker";
