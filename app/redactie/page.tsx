@@ -351,6 +351,7 @@ export default function Redactiedashboard() {
               onLabelAdd={voegLabelToe}
               onHoofdthemaFilter={(h) => { setFilterHoofdthema(h); setOpen(null); }}
               onOnderwerpFilter={(o) => { setFilterOnderwerp(o); setOpen(null); }}
+              onReanalyzed={(id, updates) => setSubmissions((p) => p.map((s) => s.id === id ? { ...s, ...updates } : s))}
             />
           )}
         </div>
@@ -495,15 +496,34 @@ function ChatInterface({ submission }: { submission: Submission }) {
   );
 }
 
-function DetailPanel({ submission: s, tenantKleur, onStatusChange, onLabelAdd, onHoofdthemaFilter, onOnderwerpFilter }: {
+function DetailPanel({ submission: s, tenantKleur, onStatusChange, onLabelAdd, onHoofdthemaFilter, onOnderwerpFilter, onReanalyzed }: {
   submission: Submission; tenantKleur: string;
   onStatusChange: (id: string, status: Status) => void;
   onLabelAdd: (id: string, label: string, huidige: string[]) => void;
   onHoofdthemaFilter: (h: Hoofdthema) => void;
   onOnderwerpFilter: (o: string) => void;
+  onReanalyzed: (id: string, updates: Partial<Submission>) => void;
 }) {
   const [labelInput, setLabelInput] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const hk = s.hoofdthema ? hoofdthemaKleur[s.hoofdthema] : null;
+
+  async function heranalyseer() {
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/reanalyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: s.id }),
+      });
+      if (res.ok) {
+        const updates = await res.json();
+        onReanalyzed(s.id, updates);
+      }
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-4">
@@ -545,7 +565,19 @@ function DetailPanel({ submission: s, tenantKleur, onStatusChange, onLabelAdd, o
 
       {/* AI Samenvatting */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-2">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">AI Samenvatting</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">AI Samenvatting</h3>
+          {s.samenvatting === "Analyse niet beschikbaar." && (
+            <button
+              onClick={heranalyseer}
+              disabled={analyzing}
+              className="text-xs px-3 py-1 rounded-lg font-medium text-white disabled:opacity-50 transition-opacity"
+              style={{ backgroundColor: tenantKleur }}
+            >
+              {analyzing ? "Bezig..." : "↻ Analyseer opnieuw"}
+            </button>
+          )}
+        </div>
         <p className="text-sm text-gray-700 leading-relaxed">{s.samenvatting}</p>
         <div className="flex flex-wrap gap-1.5 pt-1">
           {s.trefwoorden.map((t) => (
