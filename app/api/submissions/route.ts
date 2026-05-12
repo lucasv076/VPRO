@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
   if (sentiment) query = query.eq("sentiment", sentiment);
   if (hoofdthema) query = query.eq("hoofdthema", hoofdthema);
   if (onderwerp) query = query.eq("onderwerp", onderwerp);
-  if (spam === "true") query = query.or("is_spam.eq.true,status.eq.spam");
-  else query = query.or("is_spam.eq.false,is_spam.is.null").neq("status", "spam");
+  if (spam === "true") query = query.eq("is_spam", true);
+  else query = query.or("is_spam.eq.false,is_spam.is.null");
 
   const { data, error } = await query;
 

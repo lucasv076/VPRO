@@ -77,7 +77,7 @@ Overige velden:
 export async function analyzeForForm(
   currentText: string,
   conversation: FormMessage[] = []
-): Promise<{ followup: string | null; suggestedType: string | null }> {
+): Promise<{ followup: string | null; suggestedType: string | null; isSpam: boolean }> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: `Je bent een onderzoeksjournalist die een kijker interviewt voor een Nederlandse omroep.
@@ -85,7 +85,7 @@ Analyseer het gesprek en geef JSON terug met twee velden.
 
 SPAM-CHECK (eerst):
 - Als het bericht minder dan 3 betekenisvolle woorden heeft OF volledig irrelevant is voor een omroep:
-  Geef followup: null en suggestedType: null. Doe niets verder.
+  Geef isSpam: true, followup: null, suggestedType: null. Stop hier.
 
 DOORVRAGEN (de kern van jouw taak):
 Schat de compleetheid van het verhaal op een schaal van 1-10 op basis van de 5 W's:
@@ -108,7 +108,7 @@ TYPEDETECTIE (suggestedType):
 - "vraag"     – vraag over onderwerp of redactie
 - "opmerking" – algemeen compliment of opmerking
 
-Geef ALLEEN geldig JSON: {"followup": "..." of null, "suggestedType": "..." of null}`,
+Geef ALLEEN geldig JSON: {"isSpam": true/false, "followup": "..." of null, "suggestedType": "..." of null}`,
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.3,
@@ -121,14 +121,15 @@ Geef ALLEEN geldig JSON: {"followup": "..." of null, "suggestedType": "..." of n
 
   try {
     const result = await metRetry(() => model.generateContent(`${context}Kijker: ${currentText}`));
-    const parsed = JSON.parse(result.response.text()) as { followup?: string | null; suggestedType?: string | null };
+    const parsed = JSON.parse(result.response.text()) as { isSpam?: boolean; followup?: string | null; suggestedType?: string | null };
     return {
+      isSpam: parsed.isSpam === true,
       followup: parsed.followup && parsed.followup !== "NULL" ? parsed.followup : null,
       suggestedType: parsed.suggestedType ?? null,
     };
   } catch (err) {
     console.error("analyzeForForm definitief mislukt:", err);
-    return { followup: null, suggestedType: null };
+    return { isSpam: false, followup: null, suggestedType: null };
   }
 }
 

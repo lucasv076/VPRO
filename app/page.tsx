@@ -158,7 +158,14 @@ export default function InstuurFormulier() {
         body: JSON.stringify({ messages: [], currentText: tekst }),
       });
       if (res.ok) {
-        const data = await res.json() as { followup: string | null; suggestedType: string | null };
+        const data = await res.json() as { isSpam: boolean; followup: string | null; suggestedType: string | null };
+
+        // Spam: waarschuw en laat opnieuw typen
+        if (data.isSpam) {
+          voegBotToe("Dit platform is bedoeld voor journalistieke tips, ervaringen en vragen. Probeer het opnieuw met een concreet onderwerp.");
+          setFase("bericht");
+          return;
+        }
 
         // Type-wisselsuggestie als AI een ander type detecteert
         const geldigType = TYPE_KEUZE.find(k => k.type === data.suggestedType);
