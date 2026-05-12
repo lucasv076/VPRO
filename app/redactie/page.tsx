@@ -363,6 +363,7 @@ function ChatInterface({ submission }: { submission: Submission }) {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [bericht, setBericht] = useState("");
   const [sending, setSending] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const [bevestigd, setBevestigd] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -376,6 +377,22 @@ function ChatInterface({ submission }: { submission: Submission }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [replies]);
+
+  async function haalSuggestieOp() {
+    setSuggesting(true);
+    try {
+      const res = await fetch("/api/suggest-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submission),
+      });
+      const { suggestie } = await res.json();
+      if (suggestie) setBericht(suggestie);
+    } catch {
+      // stilletjes falen, textarea blijft leeg
+    }
+    setSuggesting(false);
+  }
 
   async function verstuur() {
     if (!bericht.trim()) return;
@@ -435,6 +452,17 @@ function ChatInterface({ submission }: { submission: Submission }) {
 
       {/* Input */}
       <div className="px-4 pb-4 space-y-2">
+        <button
+          onClick={haalSuggestieOp}
+          disabled={suggesting || sending}
+          className="text-xs text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-40 flex items-center gap-1"
+        >
+          {suggesting ? (
+            <span className="animate-pulse">Suggestie genereren...</span>
+          ) : (
+            <><span>✦</span> Stel antwoord voor</>
+          )}
+        </button>
         {bevestigd && (
           <div className="text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2 flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
