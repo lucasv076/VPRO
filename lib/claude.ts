@@ -3,10 +3,8 @@ import { AnalyzeResult, FormMessage, Submission, HOOFDTHEMAS } from "@/types";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 
-// Wacht ms milliseconden — gebruikt bij retry
 const wacht = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Probeert fn() maximaal twee keer; wacht 2s tussen pogingen
 async function metRetry<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
@@ -19,6 +17,7 @@ async function metRetry<T>(fn: () => Promise<T>): Promise<T> {
 
 const ANALYZE_FALLBACK: AnalyzeResult = {
   is_spam: false,
+  routing_status: "concept",
   hoofdthema: HOOFDTHEMAS[0],
   type: "overig",
   onderwerp: "onbekend",
@@ -32,33 +31,34 @@ const ANALYZE_FALLBACK: AnalyzeResult = {
   volgende_stap: "Neem contact op met de kijker voor meer informatie.",
 };
 
-
 export async function analyzeSubmission(tekst: string): Promise<AnalyzeResult> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: `Je bent een assistent die kijkersinzendingen verwerkt voor een Nederlandse omroep.
 Analyseer de inzending en geef ALLEEN een geldig JSON-object terug, zonder uitleg of markdown.
 
-Spam-regels (is_spam: true):
-- Minder dan 3 betekenisvolle woorden (bijv. "hoi", "test", "hallo", "ok")
-- Volledig irrelevant voor een omroep (bijv. "ik heb honger", "wat is het weer?")
-- Nep, reclame of automatisch gegenereerd
+ROUTING (routing_status — stel dit als EERSTE vast):
+- "spam":    Geen enkele journalistieke kern. Voorbeelden: "hoi", "test", "ik heb honger", "hallo", reclame, automatisch gegenereerd, minder dan 3 betekenisvolle woorden, volledig irrelevant voor een omroep.
+- "concept": Journalistiek relevant, maar de 5 W's (Wie, Wat, Waar, Wanneer, Waarom) zijn nog niet compleet. compleetheid_score < 8.
+- "klaar":   Journalistiek volledig bruikbaar. De 5 W's zijn helder. compleetheid_score >= 8.
 
-Fasen (fase):
-- "INHOUD": de 5 W's (Wie, Wat, Waar, Wanneer, Waarom) zijn nog niet compleet
-- "CONTACT": inhoud is helder, contactgegevens ontbreken nog
-- "AFRONDING": alles bekend, inzending is compleet en bruikbaar
+Stel is_spam: true als routing_status "spam" is, anders false.
+
+Fasen (fase — voor redactionele workflow):
+- "INHOUD":    De journalistieke kern is nog niet compleet genoeg voor de redactie.
+- "CONTACT":   Inhoud is helder maar contactgegevens ontbreken nog.
+- "AFRONDING": Alles bekend — inzending is klaar voor behandeling.
 
 Overige velden:
 - hoofdthema: EXACT één van: "Gezondheid en zorg" | "Werk en geld" | "Recht en onrecht" | "Wonen en leefomgeving" | "Onderwijs en jeugd" | "Klimaat en duurzaamheid" | "Misinformatie en privacy"
 - type: "vraag" | "klacht" | "tip" | "ervaring" | "overig"
 - onderwerp: specifiek subthema binnen het hoofdthema (max 3 woorden, Nederlands)
-- samenvatting: neutrale kern in 2-3 zinnen
+- samenvatting: neutrale kern van het verhaal — zo lang als nodig om de essentie te vangen
 - sentiment: "positief" | "neutraal" | "negatief"
-- prioriteit: 1 (laag) t/m 5 (hoog)
+- prioriteit: 1 (laag) t/m 5 (hoog) — gebaseerd op maatschappelijke impact en urgentie
 - trefwoorden: 3-5 relevante trefwoorden
-- compleetheid_score: 1-10
-- followup_vraag: één gerichte vervolgvraag als score onder 6 EN er iets cruciaal mist, anders null
+- compleetheid_score: 1-10 (8+ = journalistiek bruikbaar, alle 5 W's aanwezig)
+- followup_vraag: één gerichte vervolgvraag als score < 8 EN er iets cruciaal mist, anders null
 - volgende_stap: korte instructie voor de redacteur wat nu te doen (max 1 zin)`,
     generationConfig: {
       responseMimeType: "application/json",
@@ -74,26 +74,34 @@ Overige velden:
   }
 }
 
-// Combineert doorvraag + typedetectie + spam-check in één AI-call
 export async function analyzeForForm(
   currentText: string,
   conversation: FormMessage[] = []
 ): Promise<{ followup: string | null; suggestedType: string | null }> {
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
-    systemInstruction: `Je bent een assistent voor een journalistiek platform.
-Analyseer het bericht van een kijker en geef JSON terug met twee velden.
+    systemInstruction: `Je bent een onderzoeksjournalist die een kijker interviewt voor een Nederlandse omroep.
+Analyseer het gesprek en geef JSON terug met twee velden.
 
-Spam-check (eerst):
+SPAM-CHECK (eerst):
 - Als het bericht minder dan 3 betekenisvolle woorden heeft OF volledig irrelevant is voor een omroep:
-  Geef followup: "Dit platform is bedoeld voor journalistieke tips en ervaringen. Waarover wilt u een melding doen?" en suggestedType: null
+  Geef followup: null en suggestedType: null. Doe niets verder.
 
-5 W's (Wie, Wat, Waar, Wanneer, Waarom):
-- Als het bericht relevante journalistieke inhoud heeft maar één of meer van de 5 W's ontbreken:
-  Stel één gerichte vraag om de meest cruciale ontbrekende W op te halen.
-- Als alle relevante W's al bekend zijn: geef followup: null
+DOORVRAGEN (de kern van jouw taak):
+Schat de compleetheid van het verhaal op een schaal van 1-10 op basis van de 5 W's:
+- Wie is erbij betrokken?
+- Wat is er precies gebeurd?
+- Waar heeft dit plaatsgevonden?
+- Wanneer was dit?
+- Waarom is dit relevant / wat is de achtergrond?
 
-Typedetectie (suggestedType):
+Als de compleetheid < 8: stel ONE gerichte vervolgvraag om de meest cruciale ontbrekende W op te halen.
+  - Erken emotie KORT (max halve zin) als het bericht emotioneel geladen is, maar vraag direct door.
+  - Richt je op concrete feiten: locatie, tijdstip, namen van betrokken partijen, specifieke omstandigheden.
+  - Stel de vraag bondig en direct — geen inleidende zinnen.
+Als de compleetheid >= 8: geef followup: null. Het verhaal is journalistiek bruikbaar.
+
+TYPEDETECTIE (suggestedType):
 - "tip"       – iets gezien/meegemaakt dat onderzocht moet worden
 - "ervaring"  – persoonlijke beleving of verhaal
 - "feedback"  – correctie of kritiek op berichtgeving

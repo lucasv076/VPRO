@@ -78,6 +78,7 @@ export default function InstuurFormulier() {
   const [aiMessages, setAiMessages] = useState<FormMessage[]>([]);
   const [aiFollowupVraag, setAiFollowupVraag] = useState<string | null>(null);
   const [geadviseerdeType, setGeadviseerdeType] = useState<SelectType | null>(null);
+  const [followupRonde, setFollowupRonde] = useState(0);
   const [botTypt, setBotTypt] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -114,6 +115,31 @@ export default function InstuurFormulier() {
     setFase("bericht");
   }
 
+  const MAX_FOLLOWUPS = 3;
+
+  async function vraagAiEnVerwerk(msgs: FormMessage[], ronde: number) {
+    if (!gekozenType) return;
+    setFase("ai-bezig");
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: msgs.slice(0, -1), currentText: msgs[msgs.length - 1].content }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { followup: string | null; suggestedType: string | null };
+        if (data.followup && ronde < MAX_FOLLOWUPS) {
+          setAiFollowupVraag(data.followup);
+          voegBotToe(data.followup);
+          setFollowupRonde(ronde);
+          setFase("ai-followup");
+          return;
+        }
+      }
+    } catch { /* ga door zonder AI */ }
+    await vervolgNaHoofdBericht(gekozenType, msgs);
+  }
+
   async function stuurBericht() {
     const tekst = inputTekst.trim();
     if (!tekst || !gekozenType) return;
@@ -121,8 +147,9 @@ export default function InstuurFormulier() {
     voegUserToe(tekst);
     const nieuweAiMsgs: FormMessage[] = [{ role: "user", content: tekst }];
     setAiMessages(nieuweAiMsgs);
+    setFollowupRonde(0);
 
-    // AI analyseert in één call: doorvraag + typedetectie
+    // Eerste call: ook typedetectie
     setFase("ai-bezig");
     try {
       const res = await fetch("/api/analyze", {
@@ -137,17 +164,16 @@ export default function InstuurFormulier() {
         const geldigType = TYPE_KEUZE.find(k => k.type === data.suggestedType);
         if (geldigType && data.suggestedType !== gekozenType) {
           setGeadviseerdeType(geldigType.type);
-          // Sla de follow-up op zodat we hem later nog kunnen tonen
           if (data.followup) setAiFollowupVraag(data.followup);
           voegBotToe(`Op basis van je bericht lijkt dit meer op een "${geldigType.label}". Wil je van type wisselen?`);
           setFase("type-suggestie");
           return;
         }
 
-        // Geen typewissel nodig — doorvragen indien nuttig
-        if (data.followup) {
+        if (data.followup && 0 < MAX_FOLLOWUPS) {
           setAiFollowupVraag(data.followup);
           voegBotToe(data.followup);
+          setFollowupRonde(1);
           setFase("ai-followup");
           return;
         }
@@ -165,7 +191,12 @@ export default function InstuurFormulier() {
       ? [...aiMessages, { role: "assistant", content: aiFollowupVraag! }, { role: "user", content: tekst }]
       : aiMessages;
     setAiMessages(bijgewerkt);
-    await vervolgNaHoofdBericht(gekozenType, bijgewerkt);
+
+    if (overslaan || followupRonde >= MAX_FOLLOWUPS) {
+      await vervolgNaHoofdBericht(gekozenType, bijgewerkt);
+      return;
+    }
+    await vraagAiEnVerwerk(bijgewerkt, followupRonde + 1);
   }
 
   async function vervolgNaHoofdBericht(t: SelectType, msgs: FormMessage[]) {
@@ -278,6 +309,7 @@ export default function InstuurFormulier() {
     setGekozenType(null); setFase("keuze"); setBerichten([]);
     setInputTekst(""); setEmail(""); setTelefoon("");
     setAiMessages([]); setAiFollowupVraag(null); setGeadviseerdeType(null);
+    setFollowupRonde(0);
   }
 
   const bezig = botTypt || fase === "ai-bezig" || fase === "verzenden";
@@ -344,6 +376,31 @@ export default function InstuurFormulier() {
           {/* Chat berichten */}
           {fase !== "keuze" && (
             <>
+              {/* Fase progress */}
+              {fase !== "klaar" && (
+                <div className="px-5 pt-4 pb-2 flex items-center gap-0">
+                  {[
+                    { label: "Verhaal", actief: ["bericht","ai-bezig","ai-followup","type-suggestie"].includes(fase) },
+                    { label: "Afsluiting", actief: ["bijlage-vraag","bijlage-upload","toestemming-vraag","feedback-updates"].includes(fase) },
+                    { label: "Contact", actief: ["contact-form","verzenden"].includes(fase) },
+                  ].map((stap, i, arr) => {
+                    const eerder = arr.slice(0, i).some(s => s.actief);
+                    const klaar = !stap.actief && (eerder || arr.slice(0, i).length < arr.findIndex(s => s.actief));
+                    return (
+                      <div key={stap.label} className="flex items-center flex-1">
+                        <div className="flex flex-col items-center gap-0.5 shrink-0">
+                          <div className={`w-2 h-2 rounded-full transition-colors ${stap.actief ? "" : "bg-gray-200"}`}
+                            style={stap.actief ? { backgroundColor: tenant.kleur } : {}} />
+                          <span className={`text-[9px] font-medium transition-colors ${stap.actief ? "text-gray-700" : "text-gray-300"}`}>
+                            {stap.label}
+                          </span>
+                        </div>
+                        {i < arr.length - 1 && <div className="flex-1 h-px bg-gray-100 mx-1.5 mb-3" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {berichten.map((m, i) => (
                   <div key={i} className={`flex ${m.van === "user" ? "justify-end" : "justify-start"}`}>
