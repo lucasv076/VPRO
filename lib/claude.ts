@@ -30,7 +30,6 @@ const ANALYZE_FALLBACK: AnalyzeResult = {
   followup_vraag: null,
 };
 
-const FOLLOWUP_FALLBACK = "Kun je wat meer vertellen over de situatie? Bijvoorbeeld welk programma het betreft, wanneer het speelde, of wat je graag zou willen zien?";
 
 export async function analyzeSubmission(tekst: string): Promise<AnalyzeResult> {
   const model = genAI.getGenerativeModel({
@@ -96,8 +95,7 @@ Stuur ALLEEN de vraagtekst, of het woord NULL. Geen uitleg.`,
     return antwoord === "NULL" ? null : antwoord;
   } catch (err) {
     console.error("getFollowupQuestion definitief mislukt:", err);
-    // Geef een generieke vraag terug zodat doorvragen altijd werkt
-    return FOLLOWUP_FALLBACK;
+    return null;
   }
 }
 
