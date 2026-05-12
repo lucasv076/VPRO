@@ -83,32 +83,8 @@ export default function InstuurFormulier() {
       ? messages
       : [...messages, { role: "assistant", content: followupVraag! }, { role: "user", content: followupAntwoord }];
 
-    const nieuweCount = followupCount + 1;
-    setFollowupCount(nieuweCount);
     setMessages(bijgewerkt);
     setLoading(true);
-
-    if (!overslaan && followupAntwoord.trim() && nieuweCount < MAX_FOLLOWUPS) {
-      try {
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: bijgewerkt, currentText: followupAntwoord }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.followup) {
-            setFollowupVraag(data.followup);
-            setFollowupAntwoord("");
-            setLoading(false);
-            return;
-          }
-        }
-      } catch {
-        // AI call mislukt — gewoon doorgaan met verzenden
-      }
-    }
-
     await verstuur(bijgewerkt);
   }
 
