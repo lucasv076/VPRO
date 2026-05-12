@@ -100,28 +100,25 @@ export default function InstuurFormulier() {
     const nieuweAiMsgs: FormMessage[] = [{ role: "user", content: tekst }];
     setAiMessages(nieuweAiMsgs);
 
-    if (gekozenType === "tip" || gekozenType === "ervaring") {
-      setFase("ai-bezig");
-      try {
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: [], currentText: tekst }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.followup) {
-            setAiFollowupVraag(data.followup);
-            voegBotToe(data.followup);
-            setFase("ai-followup");
-            return;
-          }
+    // AI-doorvragen voor alle types
+    setFase("ai-bezig");
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [], currentText: tekst }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.followup) {
+          setAiFollowupVraag(data.followup);
+          voegBotToe(data.followup);
+          setFase("ai-followup");
+          return;
         }
-      } catch { /* ga door zonder follow-up */ }
-      await vervolgNaHoofdBericht(gekozenType, nieuweAiMsgs);
-    } else {
-      await vervolgNaHoofdBericht(gekozenType, nieuweAiMsgs);
-    }
+      }
+    } catch { /* ga door zonder follow-up */ }
+    await vervolgNaHoofdBericht(gekozenType, nieuweAiMsgs);
   }
 
   async function stuurFollowup(overslaan = false) {
