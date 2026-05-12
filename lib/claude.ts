@@ -28,6 +28,8 @@ const ANALYZE_FALLBACK: AnalyzeResult = {
   trefwoorden: [],
   compleetheid_score: 1,
   followup_vraag: null,
+  fase: "INHOUD",
+  volgende_stap: "Neem contact op met de kijker voor meer informatie.",
 };
 
 
@@ -37,18 +39,27 @@ export async function analyzeSubmission(tekst: string): Promise<AnalyzeResult> {
     systemInstruction: `Je bent een assistent die kijkersinzendingen verwerkt voor een Nederlandse omroep.
 Analyseer de inzending en geef ALLEEN een geldig JSON-object terug, zonder uitleg of markdown.
 
-Regels:
-- is_spam: true als het nep, reclame, betekenisloos of automatisch gegenereerd is
-- hoofdthema: kies EXACT één van deze zeven waarden:
-  "Gezondheid en zorg" | "Werk en geld" | "Recht en onrecht" | "Wonen en leefomgeving" | "Onderwijs en jeugd" | "Klimaat en duurzaamheid" | "Misinformatie en privacy"
+Spam-regels (is_spam: true):
+- Minder dan 3 betekenisvolle woorden (bijv. "hoi", "test", "hallo", "ok")
+- Volledig irrelevant voor een omroep (bijv. "ik heb honger", "wat is het weer?")
+- Nep, reclame of automatisch gegenereerd
+
+Fasen (fase):
+- "INHOUD": de 5 W's (Wie, Wat, Waar, Wanneer, Waarom) zijn nog niet compleet
+- "CONTACT": inhoud is helder, contactgegevens ontbreken nog
+- "AFRONDING": alles bekend, inzending is compleet en bruikbaar
+
+Overige velden:
+- hoofdthema: EXACT één van: "Gezondheid en zorg" | "Werk en geld" | "Recht en onrecht" | "Wonen en leefomgeving" | "Onderwijs en jeugd" | "Klimaat en duurzaamheid" | "Misinformatie en privacy"
 - type: "vraag" | "klacht" | "tip" | "ervaring" | "overig"
 - onderwerp: specifiek subthema binnen het hoofdthema (max 3 woorden, Nederlands)
 - samenvatting: neutrale kern in 2-3 zinnen
 - sentiment: "positief" | "neutraal" | "negatief"
-- prioriteit: 1 (laag) t/m 5 (hoog), op basis van urgentie of maatschappelijke waarde
+- prioriteit: 1 (laag) t/m 5 (hoog)
 - trefwoorden: 3-5 relevante trefwoorden
-- compleetheid_score: 1-10, hoe bruikbaar is dit voor de redactie
-- followup_vraag: één gerichte vervolgvraag als de score onder 6 is EN er iets cruciaal mist, anders null`,
+- compleetheid_score: 1-10
+- followup_vraag: één gerichte vervolgvraag als score onder 6 EN er iets cruciaal mist, anders null
+- volgende_stap: korte instructie voor de redacteur wat nu te doen (max 1 zin)`,
     generationConfig: {
       responseMimeType: "application/json",
     },
@@ -63,7 +74,7 @@ Regels:
   }
 }
 
-// Combineert doorvraag + typedetectie in één AI-call
+// Combineert doorvraag + typedetectie + spam-check in één AI-call
 export async function analyzeForForm(
   currentText: string,
   conversation: FormMessage[] = []
@@ -71,19 +82,25 @@ export async function analyzeForForm(
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: `Je bent een assistent voor een journalistiek platform.
-Analyseer het bericht van een kijker en geef twee dingen terug als JSON.
+Analyseer het bericht van een kijker en geef JSON terug met twee velden.
 
-1. followup: één korte, vriendelijke vervolgvraag in het Nederlands als er cruciale info mist
-   (bijv. welk programma, wanneer, wat er mis ging). Geef null als het bericht al voldoende is.
+Spam-check (eerst):
+- Als het bericht minder dan 3 betekenisvolle woorden heeft OF volledig irrelevant is voor een omroep:
+  Geef followup: "Dit platform is bedoeld voor journalistieke tips en ervaringen. Waarover wilt u een melding doen?" en suggestedType: null
 
-2. suggestedType: het meest passende type voor dit bericht:
-   "tip"       – iets gezien/meegemaakt dat onderzocht moet worden
-   "ervaring"  – persoonlijke beleving of verhaal
-   "feedback"  – correctie of kritiek op berichtgeving
-   "vraag"     – vraag over onderwerp of redactie
-   "opmerking" – algemeen compliment of opmerking
+5 W's (Wie, Wat, Waar, Wanneer, Waarom):
+- Als het bericht relevante journalistieke inhoud heeft maar één of meer van de 5 W's ontbreken:
+  Stel één gerichte vraag om de meest cruciale ontbrekende W op te halen.
+- Als alle relevante W's al bekend zijn: geef followup: null
 
-Geef ALLEEN geldig JSON terug: {"followup": "..." of null, "suggestedType": "..."}`,
+Typedetectie (suggestedType):
+- "tip"       – iets gezien/meegemaakt dat onderzocht moet worden
+- "ervaring"  – persoonlijke beleving of verhaal
+- "feedback"  – correctie of kritiek op berichtgeving
+- "vraag"     – vraag over onderwerp of redactie
+- "opmerking" – algemeen compliment of opmerking
+
+Geef ALLEEN geldig JSON: {"followup": "..." of null, "suggestedType": "..." of null}`,
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.3,

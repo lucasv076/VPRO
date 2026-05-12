@@ -14,6 +14,8 @@ export const HOOFDTHEMAS = [
 
 export type Hoofdthema = typeof HOOFDTHEMAS[number];
 
+export type Fase = "INHOUD" | "CONTACT" | "AFRONDING";
+
 export interface AnalyzeResult {
   is_spam: boolean;
   hoofdthema: Hoofdthema;
@@ -25,6 +27,8 @@ export interface AnalyzeResult {
   trefwoorden: string[];
   compleetheid_score: number;
   followup_vraag: string | null;
+  fase: Fase;
+  volgende_stap: string;
 }
 
 export interface Submission {
@@ -44,6 +48,8 @@ export interface Submission {
   prioriteit: number;
   trefwoorden: string[];
   compleetheid_score: number;
+  fase: Fase | null;
+  volgende_stap: string | null;
   status: Status;
   labels: string[];
   ingediend_op: string;

@@ -594,7 +594,17 @@ function DetailPanel({ submission: s, tenantKleur, onStatusChange, onLabelAdd, o
             ))}
           </div>
           <span className="text-xs text-gray-400">{s.prioriteit}/5</span>
+          {s.fase && (
+            <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium ${
+              s.fase === "AFRONDING" ? "bg-green-50 text-green-700" :
+              s.fase === "CONTACT"   ? "bg-blue-50 text-blue-700" :
+                                       "bg-amber-50 text-amber-700"
+            }`}>{s.fase}</span>
+          )}
         </div>
+        {s.volgende_stap && (
+          <p className="text-xs text-gray-500 italic">→ {s.volgende_stap}</p>
+        )}
       </div>
 
       {/* AI Samenvatting */}

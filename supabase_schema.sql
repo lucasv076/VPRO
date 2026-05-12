@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   prioriteit         integer     NOT NULL DEFAULT 1,
   trefwoorden        text[]      NOT NULL DEFAULT '{}',
   compleetheid_score integer     NOT NULL DEFAULT 1,
+  fase               text,
+  volgende_stap      text,
   status             text        NOT NULL DEFAULT 'nieuw',
   labels             text[]      NOT NULL DEFAULT '{}',
   ingediend_op       timestamptz NOT NULL DEFAULT now()
@@ -49,6 +51,8 @@ ALTER TABLE submissions ADD COLUMN IF NOT EXISTS sentiment          text        
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS prioriteit         integer     NOT NULL DEFAULT 1;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS trefwoorden        text[]      NOT NULL DEFAULT '{}';
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS compleetheid_score integer     NOT NULL DEFAULT 1;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS fase               text;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS volgende_stap      text;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS status             text        NOT NULL DEFAULT 'nieuw';
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS labels             text[]      NOT NULL DEFAULT '{}';
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ingediend_op       timestamptz NOT NULL DEFAULT now();

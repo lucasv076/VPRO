@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
     prioriteit: analyse.prioriteit,
     trefwoorden: analyse.trefwoorden,
     compleetheid_score: analyse.compleetheid_score,
+    fase: analyse.fase,
+    volgende_stap: analyse.volgende_stap,
     status: "nieuw",
     labels: [],
   });
