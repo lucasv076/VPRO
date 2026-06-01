@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+export const maxDuration = 60;
+
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
 
 type EmbeddingRij = {
@@ -69,7 +71,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ trends: [] });
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const trends = [];
   for (const groep of clusters) {
