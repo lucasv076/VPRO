@@ -213,7 +213,7 @@ export default function InstuurFormulier() {
       await botBericht("Goede vraag. We proberen altijd hoor en wederhoor toe te passen.");
       await verstuur(msgs, t, null, null);
     } else {
-      await botBericht("Wat ontzettend leuk om te horen! We delen je compliment met het team.");
+      await botBericht("Bedankt voor je opmerking. We hebben je bericht ontvangen en geven het door aan de redactie.");
       await verstuur(msgs, t, null, null);
     }
   }
