@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
 
   let verwerkt = 0;
   let mislukt = 0;
+  let eersteError: string | null = null;
 
   for (const rij of rijen) {
     const tekst = rij.volledige_context || rij.origineel_bericht;
@@ -40,10 +41,12 @@ export async function POST(req: NextRequest) {
       verwerkt++;
       await new Promise(r => setTimeout(r, 200));
     } catch (err) {
-      console.warn(`Embedding mislukt voor ${rij.id}:`, err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`Embedding mislukt voor ${rij.id}:`, msg);
+      if (!eersteError) eersteError = msg;
       mislukt++;
     }
   }
 
-  return NextResponse.json({ verwerkt, mislukt, totaal: rijen.length });
+  return NextResponse.json({ verwerkt, mislukt, totaal: rijen.length, eersteError });
 }
