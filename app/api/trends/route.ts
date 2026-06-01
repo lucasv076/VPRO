@@ -69,22 +69,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ trends: [] });
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-  const trends = await Promise.all(
-    clusters.map(async (groep) => {
-      const onderwerpen = groep.map((g) => g.onderwerp).join(", ");
+  const trends = [];
+  for (const groep of clusters) {
+    const onderwerpen = groep.map((g) => g.onderwerp).join(", ");
+    let naam = groep[0].onderwerp;
+    try {
       const res = await model.generateContent(
         `Geef één Nederlandse trendnaam van 4 tot 6 woorden voor dit cluster kijkersmeldingen. Geef alleen de naam, geen lijst, geen alternatieven, geen uitleg. Cluster: ${onderwerpen}`
       );
-      const naam = res.response.text().trim().split("\n")[0].replace(/^\d+\.\s*\*{0,2}/, "").replace(/\*{0,2}$/, "").trim();
-      return {
-        naam,
-        aantalMeldingen: groep.length,
-        items: groep.map(({ id, samenvatting, onderwerp }) => ({ id, samenvatting, onderwerp })),
-      };
-    })
-  );
+      const tekst = res.response.text().trim().split("\n")[0].replace(/^\d+\.\s*\*{0,2}/, "").replace(/\*{0,2}$/, "").trim();
+      if (tekst) naam = tekst;
+    } catch (err) {
+      console.warn("Trendnaam generatie mislukt:", err instanceof Error ? err.message : String(err));
+    }
+    trends.push({
+      naam,
+      aantalMeldingen: groep.length,
+      items: groep.map(({ id, samenvatting, onderwerp }) => ({ id, samenvatting, onderwerp })),
+    });
+  }
 
   return NextResponse.json({ trends });
 }
