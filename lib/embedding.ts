@@ -7,6 +7,7 @@ export async function generateEmbedding(tekst: string): Promise<number[]> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       content: { parts: [{ text: tekst }] },
+      outputDimensionality: 768,
     }),
   });
 
