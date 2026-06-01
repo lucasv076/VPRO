@@ -118,6 +118,23 @@ export default function Redactiedashboard() {
   const [filterSentiment, setFilterSentiment] = useState("");
   const [sortBy, setSortBy] = useState<"datum" | "prioriteit">("datum");
 
+  // RAG zoeken
+  const [ragVraag, setRagVraag] = useState("");
+  const [ragResultaat, setRagResultaat] = useState<{
+    antwoord: string;
+    bronnen: Array<{ id: string; onderwerp: string; samenvatting: string; gelijkenis: number }>;
+  } | null>(null);
+  const [ragBezig, setRagBezig] = useState(false);
+  const [ragPaneel, setRagPaneel] = useState(false);
+
+  // Trenddetectie
+  const [trends, setTrends] = useState<Array<{
+    naam: string;
+    aantalMeldingen: number;
+    items: Array<{ id: string; onderwerp: string; samenvatting: string }>;
+  }> | null>(null);
+  const [trendsBezig, setTrendsBezig] = useState(false);
+
   useEffect(() => {
     const params = new URLSearchParams({ tenant_id: TENANT_ID });
     if (filterHoofdthema) params.set("hoofdthema", filterHoofdthema);
@@ -151,6 +168,40 @@ export default function Redactiedashboard() {
   function wisFilters() {
     setFilterHoofdthema(""); setFilterOnderwerp(""); setFilterType("");
     setFilterStatus(""); setFilterSentiment(""); setZoekterm("");
+  }
+
+  async function zoekRAG() {
+    if (!ragVraag.trim()) return;
+    setRagBezig(true);
+    setRagResultaat(null);
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vraag: ragVraag, tenantId: TENANT_ID }),
+      });
+      setRagResultaat(await res.json());
+    } catch {
+      setRagResultaat({ antwoord: "Zoeken mislukt. Probeer opnieuw.", bronnen: [] });
+    }
+    setRagBezig(false);
+  }
+
+  async function detecteerTrends() {
+    setTrendsBezig(true);
+    setTrends(null);
+    try {
+      const res = await fetch("/api/trends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId: TENANT_ID }),
+      });
+      const data = await res.json();
+      setTrends(data.trends ?? []);
+    } catch {
+      setTrends([]);
+    }
+    setTrendsBezig(false);
   }
 
   async function updateStatus(id: string, status: Status) {
@@ -198,6 +249,23 @@ export default function Redactiedashboard() {
           <span className="text-gray-500 text-xs">ViewerPulse</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setRagPaneel(!ragPaneel); setOpen(null); }}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${ragPaneel ? "border-transparent text-white" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+            style={ragPaneel ? { backgroundColor: tenant.kleur } : {}}
+          >
+            <span>🔍</span> RAG Zoeken
+          </button>
+          <button
+            onClick={detecteerTrends}
+            disabled={trendsBezig}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {trendsBezig
+              ? <><span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />Bezig...</>
+              : <><span>📈</span> Trends</>
+            }
+          </button>
           <button onClick={() => { setSpam(!spam); setOpen(null); }}
             className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${spam ? "border-red-300 text-red-600 bg-red-50" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
             {spam ? "← Inbox" : "Spam"}
@@ -332,27 +400,124 @@ export default function Redactiedashboard() {
 
         {/* Detail */}
         <div className="flex-1 overflow-y-auto bg-gray-50">
-          {!geselecteerd ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                  <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-400">Selecteer een inzending</p>
+          {/* Trendspaneel */}
+          {trends !== null && !ragPaneel && (
+            <div className="max-w-2xl mx-auto p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-gray-900">Trends afgelopen 24 uur</h2>
+                <button onClick={() => setTrends(null)} className="text-xs text-gray-400 hover:text-gray-600">✕ Sluiten</button>
               </div>
+              {trends.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                  Niet genoeg inzendingen met embeddings voor clustering.<br />
+                  <span className="text-xs">Tip: embeddings worden pas aangemaakt bij nieuwe inzendingen na de Supabase setup.</span>
+                </div>
+              ) : trends.map((trend, i) => (
+                <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">{trend.naam}</h3>
+                    <span className="text-xs px-2.5 py-1 rounded-full font-bold text-white" style={{ backgroundColor: tenant.kleur }}>
+                      {trend.aantalMeldingen} meldingen
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {trend.items.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { setOpen(item.id); setTrends(null); }}
+                        className="w-full text-left text-xs px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                      >
+                        <span className="font-medium text-gray-700">{item.onderwerp}</span>
+                        <span className="text-gray-400 ml-2 line-clamp-1">{item.samenvatting}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : (
-            <DetailPanel
-              submission={geselecteerd}
-              tenantKleur={tenant.kleur}
-              onStatusChange={updateStatus}
-              onLabelAdd={voegLabelToe}
-              onHoofdthemaFilter={(h) => { setFilterHoofdthema(h); setOpen(null); }}
-              onOnderwerpFilter={(o) => { setFilterOnderwerp(o); setOpen(null); }}
-              onReanalyzed={(id, updates) => setSubmissions((p) => p.map((s) => s.id === id ? { ...s, ...updates } : s))}
-            />
+          )}
+
+          {/* RAG zoekpaneel */}
+          {ragPaneel && (
+            <div className="max-w-2xl mx-auto p-6 space-y-4">
+              <h2 className="font-bold text-gray-900">Zoek in inzendingen</h2>
+              <p className="text-xs text-gray-500">Stel een vraag in gewone taal. De AI zoekt semantisch naar relevante inzendingen en geeft een antwoord met bronvermelding.</p>
+              <div className="flex gap-2">
+                <input
+                  value={ragVraag}
+                  onChange={(e) => setRagVraag(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") zoekRAG(); }}
+                  placeholder="Bijv. zijn er meldingen over wateroverlast?"
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 outline-none focus:border-gray-400 bg-white"
+                  disabled={ragBezig}
+                />
+                <button
+                  onClick={zoekRAG}
+                  disabled={ragBezig || !ragVraag.trim()}
+                  className="px-5 py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition-opacity flex items-center gap-2"
+                  style={{ backgroundColor: tenant.kleur }}
+                >
+                  {ragBezig
+                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Zoeken...</>
+                    : "Zoek"
+                  }
+                </button>
+              </div>
+
+              {ragResultaat && (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">AI Antwoord</p>
+                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{ragResultaat.antwoord}</p>
+                  </div>
+
+                  {ragResultaat.bronnen.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Gevonden inzendingen ({ragResultaat.bronnen.length})</p>
+                      {ragResultaat.bronnen.map((bron, i) => (
+                        <button
+                          key={bron.id}
+                          onClick={() => { setOpen(bron.id); setRagPaneel(false); }}
+                          className="w-full text-left flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <span className="text-xs font-bold text-gray-400 mt-0.5 shrink-0">[{i + 1}]</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-gray-700">{bron.onderwerp}</p>
+                            <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{bron.samenvatting}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">Gelijkenis: {Math.round(bron.gelijkenis * 100)}%</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!ragPaneel && trends === null && (
+            !geselecteerd ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-400">Selecteer een inzending</p>
+                </div>
+              </div>
+            ) : (
+              <DetailPanel
+                submission={geselecteerd}
+                tenantKleur={tenant.kleur}
+                onStatusChange={updateStatus}
+                onLabelAdd={voegLabelToe}
+                onHoofdthemaFilter={(h) => { setFilterHoofdthema(h); setOpen(null); }}
+                onOnderwerpFilter={(o) => { setFilterOnderwerp(o); setOpen(null); }}
+                onReanalyzed={(id, updates) => setSubmissions((p) => p.map((s) => s.id === id ? { ...s, ...updates } : s))}
+              />
+            )
           )}
         </div>
       </div>

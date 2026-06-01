@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeSubmission } from "@/lib/claude";
 import { supabaseAdmin } from "@/lib/supabase";
+import { generateEmbedding } from "@/lib/embedding";
 import { FormMessage } from "@/types";
 
 export async function POST(req: NextRequest) {
@@ -20,6 +21,13 @@ export async function POST(req: NextRequest) {
 
   const analyse = await analyzeSubmission(volledige);
 
+  let embedding: number[] | null = null;
+  try {
+    embedding = await generateEmbedding(volledige);
+  } catch {
+    console.warn("Embedding mislukt, inzending wordt opgeslagen zonder vector");
+  }
+
   const { error } = await supabaseAdmin.from("submissions").insert({
     tenant_id: tenantId,
     naam: naam || null,
@@ -38,6 +46,7 @@ export async function POST(req: NextRequest) {
     compleetheid_score: analyse.compleetheid_score,
     status: "nieuw",
     labels: [],
+    embedding,
   });
 
   if (error) {

@@ -1,0 +1,85 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+
+type EmbeddingRij = {
+  id: string;
+  samenvatting: string;
+  onderwerp: string;
+  embedding: number[];
+};
+
+function cosine(a: number[], b: number[]): number {
+  const dot = a.reduce((s, v, i) => s + v * b[i], 0);
+  const normA = Math.sqrt(a.reduce((s, v) => s + v * v, 0));
+  const normB = Math.sqrt(b.reduce((s, v) => s + v * v, 0));
+  return dot / (normA * normB);
+}
+
+export async function POST(req: NextRequest) {
+  const { tenantId = "vpro", drempel = 0.82, minGroep = 3, uren = 24 } =
+    await req.json() as {
+      tenantId?: string;
+      drempel?: number;
+      minGroep?: number;
+      uren?: number;
+    };
+
+  const { data, error } = await supabaseAdmin.rpc("haal_recente_embeddings", {
+    uren,
+    tenant: tenantId,
+  });
+
+  if (error) {
+    console.error("Supabase RPC fout:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data || data.length < minGroep) {
+    return NextResponse.json({ trends: [] });
+  }
+
+  const rijen = data as EmbeddingRij[];
+  const bezocht = new Set<string>();
+  const clusters: EmbeddingRij[][] = [];
+
+  for (const item of rijen) {
+    if (bezocht.has(item.id)) continue;
+    const groep: EmbeddingRij[] = [item];
+    bezocht.add(item.id);
+
+    for (const ander of rijen) {
+      if (bezocht.has(ander.id)) continue;
+      if (cosine(item.embedding, ander.embedding) >= drempel) {
+        groep.push(ander);
+        bezocht.add(ander.id);
+      }
+    }
+
+    if (groep.length >= minGroep) clusters.push(groep);
+  }
+
+  if (clusters.length === 0) {
+    return NextResponse.json({ trends: [] });
+  }
+
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const trends = await Promise.all(
+    clusters.map(async (groep) => {
+      const onderwerpen = groep.map((g) => g.onderwerp).join(", ");
+      const res = await model.generateContent(
+        `Geef in 4 tot 6 woorden een Nederlandse trendnaam voor dit cluster van kijkersmeldingen: ${onderwerpen}`
+      );
+      return {
+        naam: res.response.text().trim(),
+        aantalMeldingen: groep.length,
+        items: groep.map(({ id, samenvatting, onderwerp }) => ({ id, samenvatting, onderwerp })),
+      };
+    })
+  );
+
+  return NextResponse.json({ trends });
+}
