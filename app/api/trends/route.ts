@@ -19,7 +19,7 @@ function cosine(a: number[], b: number[]): number {
 }
 
 export async function POST(req: NextRequest) {
-  const { tenantId = "vpro", drempel = 0.82, minGroep = 3, uren = 24 } =
+  const { tenantId = "vpro", drempel = 0.72, minGroep = 3, uren = 24 } =
     await req.json() as {
       tenantId?: string;
       drempel?: number;
@@ -75,10 +75,11 @@ export async function POST(req: NextRequest) {
     clusters.map(async (groep) => {
       const onderwerpen = groep.map((g) => g.onderwerp).join(", ");
       const res = await model.generateContent(
-        `Geef in 4 tot 6 woorden een Nederlandse trendnaam voor dit cluster van kijkersmeldingen: ${onderwerpen}`
+        `Geef één Nederlandse trendnaam van 4 tot 6 woorden voor dit cluster kijkersmeldingen. Geef alleen de naam, geen lijst, geen alternatieven, geen uitleg. Cluster: ${onderwerpen}`
       );
+      const naam = res.response.text().trim().split("\n")[0].replace(/^\d+\.\s*\*{0,2}/, "").replace(/\*{0,2}$/, "").trim();
       return {
-        naam: res.response.text().trim(),
+        naam,
         aantalMeldingen: groep.length,
         items: groep.map(({ id, samenvatting, onderwerp }) => ({ id, samenvatting, onderwerp })),
       };
