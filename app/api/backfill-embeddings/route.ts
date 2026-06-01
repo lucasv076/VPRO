@@ -30,10 +30,13 @@ export async function POST(req: NextRequest) {
 
     try {
       const embedding = await generateEmbedding(tekst);
-      await supabaseAdmin
+      // pgvector verwacht string-formaat "[0.1,0.2,...]" via PostgREST
+      const embeddingStr = `[${embedding.join(",")}]`;
+      const { error: updateError } = await supabaseAdmin
         .from("submissions")
-        .update({ embedding })
+        .update({ embedding: embeddingStr })
         .eq("id", rij.id);
+      if (updateError) throw new Error(`DB update fout: ${updateError.message}`);
       verwerkt++;
       await new Promise(r => setTimeout(r, 200));
     } catch (err) {

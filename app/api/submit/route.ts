@@ -21,9 +21,10 @@ export async function POST(req: NextRequest) {
 
   const analyse = await analyzeSubmission(volledige);
 
-  let embedding: number[] | null = null;
+  let embeddingStr: string | null = null;
   try {
-    embedding = await generateEmbedding(volledige);
+    const embeddingVec = await generateEmbedding(volledige);
+    embeddingStr = `[${embeddingVec.join(",")}]`;
   } catch {
     console.warn("Embedding mislukt, inzending wordt opgeslagen zonder vector");
   }
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     compleetheid_score: analyse.compleetheid_score,
     status: "nieuw",
     labels: [],
-    embedding,
+    embedding: embeddingStr,
   });
 
   if (error) {

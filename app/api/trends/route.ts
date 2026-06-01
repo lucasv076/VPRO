@@ -41,7 +41,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ trends: [] });
   }
 
-  const rijen = data as EmbeddingRij[];
+  // PostgREST geeft vector terug als string "[0.1,0.2,...]" — parse naar number[]
+  const rijen = (data as (Omit<EmbeddingRij, "embedding"> & { embedding: number[] | string })[]).map(r => ({
+    ...r,
+    embedding: typeof r.embedding === "string" ? JSON.parse(r.embedding) : r.embedding,
+  })) as EmbeddingRij[];
   const bezocht = new Set<string>();
   const clusters: EmbeddingRij[][] = [];
 

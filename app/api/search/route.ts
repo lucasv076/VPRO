@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Geen vraag opgegeven" }, { status: 400 });
   }
 
-  const queryEmbedding = await generateEmbedding(vraag);
+  const queryEmbeddingVec = await generateEmbedding(vraag);
+  const queryEmbedding = `[${queryEmbeddingVec.join(",")}]`;
 
   const { data: resultaten, error } = await supabaseAdmin.rpc("zoek_vergelijkbaar", {
     query_embedding: queryEmbedding,
