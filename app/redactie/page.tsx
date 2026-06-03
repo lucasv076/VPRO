@@ -264,7 +264,7 @@ export default function Redactiedashboard() {
             <span>🔍</span> RAG Zoeken
           </button>
           <button
-            onClick={detecteerTrends}
+            onClick={() => detecteerTrends()}
             disabled={trendsBezig}
             className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
           >
