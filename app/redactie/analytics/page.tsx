@@ -221,7 +221,7 @@ export default function AnalyticsPage() {
                         <Cell key={entry.naam} fill={SENTIMENT_KLEUREN[entry.naam] ?? "#94a3b8"} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(val: number) => [`${val} inzendingen`]} />
+                    <Tooltip formatter={(val) => [`${Number(val ?? 0)} inzendingen`]} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-2">
@@ -254,7 +254,7 @@ export default function AnalyticsPage() {
                     tickLine={false}
                   />
                   <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip formatter={(val: number) => [`${val} inzendingen`]} labelFormatter={(l) => TYPE_LABELS[l] ?? l} />
+                  <Tooltip formatter={(val) => [`${Number(val ?? 0)} inzendingen`]} labelFormatter={(l) => TYPE_LABELS[String(l)] ?? String(l)} />
                   <Bar dataKey="waarde" radius={[4, 4, 0, 0]}>
                     {data.types.map((entry) => (
                       <Cell key={entry.naam} fill={TYPE_KLEUREN[entry.naam] ?? "#94a3b8"} />
@@ -336,7 +336,7 @@ export default function AnalyticsPage() {
                     tickLine={false}
                   />
                   <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip formatter={(val: number) => [`${val} inzendingen`]} labelFormatter={(l) => `Prioriteit ${l}`} />
+                  <Tooltip formatter={(val) => [`${Number(val ?? 0)} inzendingen`]} labelFormatter={(l) => `Prioriteit ${l}`} />
                   <Bar dataKey="aantal" radius={[4, 4, 0, 0]}>
                     {data.prioriteiten.map((entry) => (
                       <Cell key={entry.prioriteit} fill={PRIORITEIT_KLEUREN[(entry.prioriteit - 1)] ?? "#94a3b8"} />
