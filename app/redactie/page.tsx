@@ -134,6 +134,7 @@ export default function Redactiedashboard() {
     items: Array<{ id: string; onderwerp: string; samenvatting: string }>;
   }> | null>(null);
   const [trendsBezig, setTrendsBezig] = useState(false);
+  const [trendsUren, setTrendsUren] = useState(24);
 
   useEffect(() => {
     const params = new URLSearchParams({ tenant_id: TENANT_ID });
@@ -187,14 +188,15 @@ export default function Redactiedashboard() {
     setRagBezig(false);
   }
 
-  async function detecteerTrends() {
+  async function detecteerTrends(uren?: number) {
+    const u = uren ?? trendsUren;
     setTrendsBezig(true);
     setTrends(null);
     try {
       const res = await fetch("/api/trends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId: TENANT_ID }),
+        body: JSON.stringify({ tenantId: TENANT_ID, uren: u }),
       });
       const data = await res.json();
       setTrends(data.trends ?? []);
@@ -202,6 +204,11 @@ export default function Redactiedashboard() {
       setTrends([]);
     }
     setTrendsBezig(false);
+  }
+
+  function wisselPeriode(uren: number) {
+    setTrendsUren(uren);
+    detecteerTrends(uren);
   }
 
   async function updateStatus(id: string, status: Status) {
@@ -403,14 +410,36 @@ export default function Redactiedashboard() {
           {/* Trendspaneel */}
           {trends !== null && !ragPaneel && (
             <div className="max-w-2xl mx-auto p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-bold text-gray-900">Trends afgelopen 24 uur</h2>
-                <button onClick={() => setTrends(null)} className="text-xs text-gray-400 hover:text-gray-600">✕ Sluiten</button>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="font-bold text-gray-900">Trends</h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Periode filter */}
+                  <div className="flex gap-1 bg-gray-100 p-0.5 rounded-lg">
+                    {([
+                      { label: "24 uur", uren: 24 },
+                      { label: "Week",   uren: 168 },
+                      { label: "Maand",  uren: 720 },
+                      { label: "Jaar",   uren: 8760 },
+                    ] as const).map(({ label, uren }) => (
+                      <button
+                        key={uren}
+                        onClick={() => wisselPeriode(uren)}
+                        disabled={trendsBezig}
+                        className={`text-xs px-2.5 py-1 rounded-md font-medium transition-colors disabled:opacity-50 ${trendsUren === uren ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                        style={trendsUren === uren ? { backgroundColor: tenant.kleur } : {}}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {trendsBezig && <span className="w-3.5 h-3.5 border border-gray-400 border-t-transparent rounded-full animate-spin" />}
+                  <button onClick={() => setTrends(null)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+                </div>
               </div>
               {trends.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                  Niet genoeg inzendingen met embeddings voor clustering.<br />
-                  <span className="text-xs">Tip: embeddings worden pas aangemaakt bij nieuwe inzendingen na de Supabase setup.</span>
+                  Geen trends gevonden in de geselecteerde periode.<br />
+                  <span className="text-xs">Probeer een langere periode of wacht tot er meer inzendingen zijn.</span>
                 </div>
               ) : trends.map((trend, i) => (
                 <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
