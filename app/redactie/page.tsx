@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { Submission, Status, SubmissionType, Sentiment, HOOFDTHEMAS, Hoofdthema } from "@/types";
 import { tenants } from "@/lib/tenants";
 
@@ -277,6 +278,10 @@ export default function Redactiedashboard() {
             className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${spam ? "border-red-300 text-red-600 bg-red-50" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
             {spam ? "← Inbox" : "Spam"}
           </button>
+          <Link href="/redactie/analytics"
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+            <span>📊</span> Analytics
+          </Link>
           <a href="/" target="_blank" className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">
             Formulier ↗
           </a>
